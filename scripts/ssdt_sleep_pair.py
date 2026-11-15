@@ -96,7 +96,7 @@ def phase(name, path, native):
         save(path, result)
 
 
-def worker():
+def worker(resume_overlay=False):
     if '/system.slice/' not in Path('/proc/self/cgroup').read_text():
         raise RuntimeError('The observer must run outside the user freezer')
     native = overlay.native_state()
@@ -104,24 +104,35 @@ def worker():
         raise RuntimeError('Native open-lid s2idle state is required')
     check_native(native)
     validation = json.loads((ROOT / 'local/runtime-ssdt/state.json').read_text())
-    if validation.get('state') != 'validated_and_active' or validation['before']['boot_id'] != native['boot_id']:
+    if not resume_overlay and (validation.get('state') != 'validated_and_active' or validation['before']['boot_id'] != native['boot_id']):
         raise RuntimeError('Runtime overlay validation is required in the same boot')
     directory = ROOT / 'local/ssdt-trials'
     directory.mkdir(parents=True, exist_ok=True)
     os.chown(directory, OWNER.st_uid, OWNER.st_gid)
     pair_path = directory / (native['boot_id'] + '-pair.json')
-    if pair_path.exists():
+    if pair_path.exists() and not resume_overlay:
         raise RuntimeError('A pair was already attempted in this boot; no automatic repeat')
-    result = {'state': 'preparing', 'native_before': native, 'started_at': datetime.datetime.now().astimezone().isoformat(),
-              'maximum_trials': 2, 'reboot_required': False, 'persistent_boot_changes': False}
+    if resume_overlay:
+        result = json.loads(pair_path.read_text())
+        overlay_path = directory / (native['boot_id'] + '-overlay.json')
+        if result.get('state') != 'error' or result.get('native', {}).get('state') != 'returned' or overlay_path.exists():
+            raise RuntimeError('Only an unstarted overlay phase may be resumed')
+        if int(native['sleep_count']) != int(result['native_before']['sleep_count']) + 1:
+            raise RuntimeError('Unexpected additional sleep cycles; comparison conditions changed')
+        result['observer_error_before_resume'] = result.pop('error')
+        check_native(result['native_before'])
+    else:
+        result = {'state': 'preparing', 'native_before': native, 'started_at': datetime.datetime.now().astimezone().isoformat(),
+                  'maximum_trials': 2, 'reboot_required': False, 'persistent_boot_changes': False}
     save(pair_path, result)
     try:
-        overlay.remove()
-        result['state'] = 'native_trial'
-        save(pair_path, result)
-        result['native'] = phase('native', directory / (native['boot_id'] + '-native.json'), native)
-        save(pair_path, result)
-        time.sleep(5)
+        if not resume_overlay:
+            overlay.remove()
+            result['state'] = 'native_trial'
+            save(pair_path, result)
+            result['native'] = phase('native', directory / (native['boot_id'] + '-native.json'), native)
+            save(pair_path, result)
+            time.sleep(5)
         subprocess.run(['/usr/bin/python3', str(ROOT / 'scripts/runtime_ssdt.py'), 'validate'], check=True)
         result['state'] = 'overlay_trial'
         save(pair_path, result)
@@ -147,13 +158,16 @@ def worker():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--resume-overlay', action='store_true', help='Resume only if the baseline returned and the overlay phase was never started')
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error('Root access is required')
     if args.worker:
-        worker()
+        worker(args.resume_overlay)
     else:
         boot = overlay.native_state()['boot_id'][:8]
-        subprocess.run(['systemd-run', '--unit=chrg-ssdt-pair-' + boot, '--service-type=exec',
+        unit = 'chrg-ssdt-overlay-' + boot if args.resume_overlay else 'chrg-ssdt-pair-' + boot
+        subprocess.run(['systemd-run', '--unit=' + unit, '--service-type=exec',
                         '--description=One native versus address-free SSDT comparison',
-                        '/usr/bin/python3', str(Path(__file__).resolve()), '--worker'], check=True)
+                        '/usr/bin/python3', str(Path(__file__).resolve()), '--worker',
+                        *(['--resume-overlay'] if args.resume_overlay else [])], check=True)

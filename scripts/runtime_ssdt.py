@@ -106,8 +106,8 @@ def unload(path):
         path.rmdir()
 
 
-def device_status(hid):
-    devices = list(Path('/sys/bus/acpi/devices').glob(hid + ':*'))
+def device_status(hid, root=Path('/sys/bus/acpi/devices')):
+    devices = list(root.glob(hid + ':*'))
     if len(devices) > 1:
         raise RuntimeError('Multiple matching test devices exist')
     if not devices:
@@ -115,7 +115,11 @@ def device_status(hid):
     device = devices[0]
     if (device / 'driver').exists():
         raise RuntimeError('A driver unexpectedly bound to a notification test object')
-    return int((device / 'status').read_text().strip())
+    try:
+        return int((device / 'status').read_text().strip())
+    except FileNotFoundError:
+        # ACPI hot-remove deletes attributes and the directory asynchronously.
+        return None
 
 
 def probe(expected):
