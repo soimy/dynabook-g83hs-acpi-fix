@@ -8,7 +8,7 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / 'local/ssdt'
+OUTPUT = ROOT / 'build/acpi'
 
 
 def run(command, log):
@@ -43,8 +43,11 @@ def simulate(name, files, commands):
 def main():
     os.umask(0o077)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    overlay = compile_table(ROOT / 'ssdt/SSDT-CHRG.dsl', 'SSDT-CHRG')
-    probe = compile_table(ROOT / 'ssdt/SSDT-PROBE.dsl', 'SSDT-PROBE')
+    manifest = json.loads((ROOT / 'acpi/manifest.json').read_text())
+    source = ROOT / 'acpi/SSDT-CHRG.dsl'
+    if hashlib.sha256(source.read_bytes()).hexdigest() != manifest['ssdt']['source_sha256']:
+        raise RuntimeError('The verified SSDT source changed; review it before building')
+    overlay = compile_table(source, 'SSDT-CHRG')
     fixture = compile_table(ROOT / 'tests/fixtures/chrg_namespace.dsl', 'fixture')
     base = r'\_SB.PC00.LPCB.EC'
     lid = r'\_SB.LID._LID'
@@ -64,31 +67,26 @@ def main():
     known = simulate('existing-device', [existing_aml, overlay], ['execute ' + base + '.CHRG._STA'])
     if 'AE_ALREADY_EXISTS' in known or integer(known, base + '.CHRG._STA') != 15:
         raise RuntimeError('The overlay changed an already-existing device')
-    probe_path = r'\_SB.CQPR._STA'
-    before = simulate('probe-before', [fixture, probe], ['execute ' + probe_path])
-    after = simulate('probe-after', [fixture, overlay, probe], ['execute ' + probe_path])
-    if integer(before, probe_path) != 0 or integer(after, probe_path) != 15 or 'AE_NOT_FOUND' in after:
-        raise RuntimeError('The readout probe failed to distinguish the states')
     files = {}
-    for path in [overlay, probe]:
+    for path in [overlay]:
         data = path.read_bytes()
         if data[:4] != b'SSDT' or int.from_bytes(data[4:8], 'little') != len(data) or sum(data) % 256:
             raise RuntimeError('Invalid compiled SSDT header')
-        source = ROOT / 'ssdt' / (path.stem + '.dsl')
         text = source.read_text()
         if re.search(r'\b(OperationRegion|Field|IndexField|BankField)\s*\(', text):
             raise RuntimeError('The supplement must not introduce hardware address fields')
         files[path.stem] = {'file': path.name, 'sha256': hashlib.sha256(data).hexdigest(),
                             'size': len(data), 'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
+    if files['SSDT-CHRG'] != manifest['ssdt']:
+        raise RuntimeError('The compiler did not reproduce the verified SSDT payload')
     result = {'files': files, 'compiler_errors': 0, 'compiler_warnings': 0,
               'offline_tests_passed': {'missing_target_reproduced': True,
                                        'notify_completes_with_overlay': True,
                                        'lid_result_unchanged': True,
                                        'new_device_disabled': True,
-                                       'existing_device_preserved': True,
-                                       'probe_before_zero_after_fifteen': True},
+                                       'existing_device_preserved': True},
               'operation_regions_added': 0, 'dsdt_replaced': False}
-    (ROOT / 'ssdt/manifest.json').write_text(json.dumps(result, indent=2) + '\n')
+    (OUTPUT / 'validation.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
 
 

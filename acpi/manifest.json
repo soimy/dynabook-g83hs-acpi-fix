@@ -1,0 +1,19 @@
+{
+  "target": {
+    "product_name": "dynabook G83/HS",
+    "board": "A010D",
+    "bios_version": "Version 8.90",
+    "tested_kernel": "7.2.15-1-omarchy",
+    "native_dsdt_oem_revision": "0x20240103",
+    "native_dsdt_compiler_revision": "0x20191018",
+    "main_ec_gpe": "0x6E",
+    "sleep_mask_gpe": "0x6F"
+  },
+  "ssdt": {
+    "file": "SSDT-CHRG.aml",
+    "sha256": "6122a79984b6f241a869add889f6646c3446d3c22350f8b1121bc0e90f9975db",
+    "size": 146,
+    "source_sha256": "96fb326664554dc600de83c047ccadf239ce00d5881fca8cbb96af9929cdc386"
+  },
+  "sleep_fix_sha256": "7cef4bf367942daa19a14673d617525269dd7d06cd884118d4ee368eb9f99fa9"
+}

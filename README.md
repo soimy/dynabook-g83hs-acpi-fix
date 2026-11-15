@@ -1,60 +1,123 @@
-# Dynabook G83/HS：ACPI 与 s2idle 修复
+**English** | [简体中文](README.zh-CN.md)
 
-本机已定位到 **GPE 6F 唤醒路径造成 s2idle 提前退出**。只补齐 CHRG 对象时仍约 3 秒醒来；睡眠期间临时屏蔽 6F 后，60 秒测试记录到 **57.48 秒硬件 S0ix 驻留**。具体是哪一个下游 PCIe/PEG 设备触发，尚未确认。[隔离试验结果](results/2026-11-16-gpe6f-isolation.json)
+# Dynabook G83/HS: s2idle and ACPI CHRG workaround
 
-当前修复由两部分组成：
+A machine-tested workaround for **entering S0ix low-power sleep when the lid closes and resuming when it opens**. Verified on a Dynabook G83/HS (A010D), BIOS 8.90, Omarchy, kernel `7.2.15-1-omarchy`. Other firmware or kernels require validation.
 
-- **146 字节的无地址 SSDT**：只补齐缺失的 CHRG 通知目标，保留当前启动的固件 DSDT 和全部 OperationRegion 地址，解决 ACPI 地址跨启动变化的问题。
-- **仅在睡眠期间屏蔽 GPE 6F**：进入 s2idle 前屏蔽，恢复后解除；挂起失败时也清理。主 EC GPE 6E 保持原样。
+This page is the human guide to diagnosis, installation and acceptance. For a coding agent, use the [LLM repair prompt](prompts/repair.md). Successful hardware measurements are in [validation/verified.json](validation/verified.json).
 
-已安装的配置针对本机 G83/HS、BIOS 8.90；当前实测内核为 7.2.15-1-omarchy。未修改内核参数、initramfs、UKI 或 Limine 入口。正常使用不设置定时唤醒，不要求重启。[修复机制及撤销方法](docs/sleep-workaround.md)
+## Root cause
 
-**已安装配置的电池供电验证通过**：正常 systemd 挂起流程约 61.44 秒后恢复，硬件 S0ix 驻留增加 57.60 秒。醒后 6F 已解除屏蔽，主 EC 正常，DSDT 与原始 UKI 均未变，RTC 已清空。[安装后实测结果](results/2026-11-16-installed-sleep-fix.json)
+### 1. Premature wake comes through GPE 6F
 
-**实际合盖/开盖验证也通过**：01:08:34 合盖，01:09:30 开盖；挂起约 55.32 秒，其中 53.17 秒处于 S0ix，约占 96.1%。开盖后约 47 毫秒记录到内核退出挂起，期间未提前醒来、未发生休眠循环。本次未安排 RTC 测试闹钟。[实际合盖结果](results/2026-11-16-lid-close-open.json)
+The affected machine leaves s2idle shortly after lid-close, repeatedly suspends/resumes, remains warm and drains its battery. Hardware S0ix residency stays at zero. The main EC uses **GPE 6E**; a separate **6F** generates frequent events while awake. This firmware's `_L6F` dispatches to PCIe/PEG GPIO wake paths.
 
-这会限制睡眠期间经 6F 路径发起的 PCIe/PEG 唤醒。较长时间的电池耗电及未来重启后的首次挂起仍需单独验收。不能将一分钟试验换算为整夜续航，也不能据此认定读卡器是唯一故障源。
+Isolation established the causal path: keeping the current native DSDT and other conditions unchanged, masking only 6F across sleep allowed approximately one minute of suspend with substantial hardware S0ix residency. Shared ACPI SCI IRQ 9 cannot identify a device by itself. **The exact downstream device is still unidentified**; the card reader has not been established as the unique cause.
 
-## 验证记录
+### 2. Missing CHRG is a separate firmware error
 
-| 条件 | 返回时间 | 硬件 S0ix 驻留 |
-| --- | ---: | ---: |
-| 原生 DSDT | 2.95 秒 | 0 |
-| 原生 DSDT + CHRG SSDT | 3.21 秒 | 0 |
-| CHRG SSDT + 临时屏蔽 6F | 60.97 秒 | 57.48 秒 |
-| 已安装睡眠钩子，电池供电 | 61.44 秒 | 57.60 秒 |
-| 实际合盖后开盖，无 RTC 测试闹钟 | 挂起 55.32 秒 | 53.17 秒 |
+`\_SB.PC00.LPCB.EC._Q01` executes `Notify (CHRG, 0x80)` after adapter and battery notifications. The target is absent from the Linux namespace, causing `AE_NOT_FOUND` and aborting the method. Adding CHRG corrects that error, but a same-boot comparison established that **the CHRG correction alone does not prevent premature wake**.
 
-前两组为同次启动对照，见[原始结果](results/2026-11-16-same-boot-sleep-comparison.json)。前四项测试均使用 60 秒 RTC 定时器，完成后清空；最后一项由用户实际开盖恢复。IRQ 9 在异常提前醒来与正常 RTC 唤醒时都可能出现，不能单独据此判错。
+### 3. ACPI memory addresses legitimately vary between boots
 
-CHRG 补充表已经通过离线 ACPICA 仿真和实机加载/撤销验证。原始 DSDT 在同次启动内逐字节不变，盖子状态保持正常。[无地址 SSDT 设计](docs/address-free-ssdt.md)
+Several `OperationRegion` base addresses in this machine's DSDT change across boots, including `GRSV`, which contains the lid-state field. Reusing a previously dumped whole DSDT preserves stale addresses and can misread lid or other state. Preserve the firmware's current table and addresses; supplement its namespace instead. A DSDT hash can establish **same-boot** integrity, but must not be pinned across boots as a machine identity.
 
-## 本地构建与检查
+## Reproduction and diagnosis
 
-依赖 Python 3、ACPICA 的 iasl/acpiexec。完整固件、编译产物、UKI 和原始系统日志仅保存在忽略的 `local/` 中。
+Check the model, BIOS, selected sleep mode and interrupt state:
 
 ```bash
-python3 scripts/build_ssdt.py
-python3 -m unittest discover -s tests -v
+cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/bios_version
+cat /sys/power/mem_sleep
+sudo dmesg | rg 'CHRG|AE_NOT_FOUND|ACPI: EC: GPE'
+cat /sys/firmware/acpi/interrupts/gpe6E
+cat /sys/firmware/acpi/interrupts/gpe6F
+sleep 2
+cat /sys/firmware/acpi/interrupts/gpe6F
 ```
 
-本机安装器要求此前的成功隔离记录及本地捕获输入，不是面向任意型号的一键安装器。已安装的四个文件及摘要记录在本机 `/var/lib/dynabook-sleep/installation.json`。
+The supported machine reports `dynabook G83/HS`, `Version 8.90`, and selected `[s2idle]`. Rapid growth in the 6F count supports diagnosis; actual sleep measurements are needed to establish the failure.
+
+On an untreated affected machine, save work, close the lid for about one minute, then reopen it. Compare the hardware residency counter before/after and check for repeated suspend/resume:
 
 ```bash
-# 在本机撤销已安装的配置
+sudo cat /sys/kernel/debug/pmc_core/slp_s0_residency_usec
+# Close the lid for about one minute and reopen it; subtract the first reading.
+sudo cat /sys/kernel/debug/pmc_core/slp_s0_residency_usec
+journalctl -b -u systemd-logind.service -u systemd-suspend.service --since '5 minutes ago'
+journalctl -b -k --since '5 minutes ago' -g 'PM: suspend|CHRG|AE_NOT_FOUND'
+```
+
+The original open-lid comparison returned in approximately three seconds with zero S0ix residency; the closed-lid case could repeatedly suspend. A working installation need not be removed merely to reproduce the fault. The offline build also reproduces the missing-CHRG error in a fully simulated namespace and verifies its correction; it never loads that simulated DSDT into the running kernel.
+
+## Fix design
+
+- **Address-free SSDT:** a 146-byte table conditionally adds a disabled `_STA=0` notification target when CHRG is missing. An existing CHRG is preserved. It introduces no registers, physical addresses, OperationRegions or method replacement.
+- **Sleep-only 6F mask:** the systemd pre-hook records the original mask and masks 6F before s2idle; the post-hook restores its previous state. The main EC 6E is unchanged.
+- **Failure cleanup:** `ExecStopPost` also restores state. Cleanup is idempotent and preserves masks previously set by another tool. Runtime state in `/run/dynabook-sleep/` is scoped to a boot ID.
+
+The SSDT loads through configfs. After a reboot, the hook reloads it on the first suspend. The hook avoids frozen user-session services. This is a local system sleep workaround; PCIe/PEG wake through 6F is restricted during sleep.
+
+## Install
+
+Requires Python 3, ACPICA's `iasl`/`acpiexec`, and kernel `CONFIG_ACPI_CONFIGFS` support. On Omarchy, install the compiler tools with `omarchy pkg add acpica`. These steps work from a clean clone without complete vendor firmware or previous experiment records.
+
+```bash
+gh repo clone soimy/dynabook-g83hs-acpi-fix
+cd dynabook-g83hs-acpi-fix
+python3 scripts/build_ssdt.py
+python3 -m unittest discover -s tests -v
+sudo python3 scripts/install_sleep_fix.py --check
+sudo python3 scripts/install_sleep_fix.py
+sudo python3 scripts/install_sleep_fix.py --status
+```
+
+The builder verifies source and compiled AML against the hardware-tested hashes and runs offline interpreter checks. The installer checks the model, BIOS, native DSDT metadata and s2idle; it refuses unrelated existing target files. Reinstalling the same revision only verifies the installation. A new installation briefly exercises pre/post cleanup and restores the mask; it does not suspend or reboot the machine.
+
+Installed files are root-owned:
+
+| Path | Purpose |
+| --- | --- |
+| `/usr/local/libexec/dynabook-sleep/sleep_fix.py` | Verified runtime logic |
+| `/usr/local/libexec/dynabook-sleep/SSDT-CHRG.aml` | Address-free supplement |
+| `/usr/lib/systemd/system-sleep/90-dynabook-gpe6f` | pre/post hook |
+| `/etc/systemd/system/systemd-suspend.service.d/90-dynabook-gpe6f.conf` | Failure cleanup |
+
+The installation record is `/var/lib/dynabook-sleep/installation.json`. No Limine, kernel-command-line, initramfs or UKI changes are needed, and no reboot is required. The workaround schedules no RTC alarm and does not configure hibernation.
+
+## Acceptance and verified results
+
+Save work, close the lid for at least one minute on battery, reopen it, then run:
+
+```bash
+sudo python3 scripts/install_sleep_fix.py --status
+journalctl -b -u systemd-logind.service -u systemd-suspend.service --since '5 minutes ago'
+```
+
+Require one suspend/resume cycle and resume following lid-open. Check that `last_cycle_is_current_boot`, `mask_state_restored`, `original_dsdt_unchanged` and `native_dsdt_matches_last_cycle` are true, and `pending_cleanup_exists` is false. GPE 6F and the main EC 6E should be `unmasked` while awake. `slp_s0_residency_delta_us` should approach the actual sleeping interval. If PMC is not exposed, this value can be null; check the debugfs mount at `/sys/kernel/debug` and platform support. A black screen alone does not establish low-power success.
+
+| Successful hardware test | Suspend/resume interval | S0ix residency |
+| --- | ---: | ---: |
+| Battery, production hook, 60-second test alarm | 61.44 s including overhead | 57.60 s |
+| Actual lid-close/open, no test alarm | 55.32 s | 53.17 s (96.1%) |
+
+In the physical lid test, the kernel logged suspend exit approximately 47 ms after lid-open. The native DSDT remained unchanged, with no new ACPI errors. Short tests do not quantify overnight battery drain; long-duration drain, other physical wake methods and the first suspend after a future reboot require their own acceptance checks.
+
+## Remove
+
+```bash
 sudo python3 scripts/install_sleep_fix.py --remove
 ```
 
-## 已停用的完整 DSDT 实验
+Removal verifies the installation record and file hashes, restores the mask owned by this workaround, unloads the matching SSDT, deletes the installed files and reloads systemd. It refuses to delete locally changed files and also accepts the earlier successful installation record on this machine. Deleting the repository clone does not uninstall the workaround.
 
-早期 A Control 使用重新编译的完整 DSDT，因固定了前次启动的 OperationRegion 地址，导致盖子误报合上和反复休眠。A/B 入口与镜像已移除；B 未启动，旧安装器已加停止保护。不要恢复这条路线。[失败与恢复分析](docs/failure-analysis.md)、[历史实验步骤](docs/experiment.md)
+## Repository and references
 
-BIOS 升级前 deep 模式曾黑屏并需要强制关机；当前修复只使用 s2idle。
+`fix/` contains the verified runtime; `acpi/` the SSDT source and pinned hashes; `scripts/` the builder and install/check/status/remove entry point; `tests/` offline semantics and restoration safeguards; `validation/` successful hardware evidence; `prompts/` copyable agent instructions. Generated files go into ignored `build/`.
 
-## 来源与许可
+- [Linux SSDT overlays/configfs](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html#loading-acpi-ssdts-from-configfs)
+- [Linux GPE sysfs mask/unmask implementation](https://github.com/torvalds/linux/blob/master/drivers/acpi/sysfs.c)
+- [systemd sleep-hook timing and frozen user sessions](https://www.freedesktop.org/software/systemd/man/latest/systemd-suspend.service.html)
 
-- [内核 SSDT overlays/configfs 文档](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html#loading-acpi-ssdts-from-configfs)
-- [ACPI GPE sysfs 实现](https://github.com/torvalds/linux/blob/master/drivers/acpi/sysfs.c)
-- [Linux 睡眠状态](https://docs.kernel.org/admin-guide/pm/sleep-states.html)
-
-本仓库新写脚本采用 MIT 许可。厂商固件及补丁上下文中的厂商代码保留原有权利；仓库不附带完整固件。
+New code is [MIT licensed](LICENSE). Complete vendor ACPI firmware is not distributed.

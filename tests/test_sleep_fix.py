@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-SOURCE = Path(__file__).resolve().parents[1] / 'production/sleep_fix.py'
+SOURCE = Path(__file__).resolve().parents[1] / 'fix/sleep_fix.py'
 spec = importlib.util.spec_from_file_location('sleep_fix', SOURCE)
 fix = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fix)

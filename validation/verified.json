@@ -1,0 +1,68 @@
+{
+  "tested_at": "2026-11-16",
+  "target": {
+    "product_name": "dynabook G83/HS",
+    "board": "A010D",
+    "bios_version": "Version 8.90",
+    "tested_kernel": "7.2.15-1-omarchy",
+    "native_dsdt_oem_revision": "0x20240103",
+    "native_dsdt_compiler_revision": "0x20191018",
+    "main_ec_gpe": "0x6E",
+    "sleep_mask_gpe": "0x6F"
+  },
+  "payload": {
+    "file": "SSDT-CHRG.aml",
+    "sha256": "6122a79984b6f241a869add889f6646c3446d3c22350f8b1121bc0e90f9975db",
+    "size": 146,
+    "source_sha256": "96fb326664554dc600de83c047ccadf239ce00d5881fca8cbb96af9929cdc386"
+  },
+  "sleep_fix_sha256": "7cef4bf367942daa19a14673d617525269dd7d06cd884118d4ee368eb9f99fa9",
+  "installed_hook_test": {
+    "test_started_at": "2026-11-16T00:53:52.294700+08:00",
+    "power_source": "battery",
+    "lid_state": "open",
+    "requested_seconds": 60,
+    "elapsed_including_suspend_seconds": 61.43925468799989,
+    "slp_s0_residency_delta_us": 57598518,
+    "persistent_hook_verified": true,
+    "mask_state_restored": true,
+    "main_ec_6e_unmasked_before_and_after": true,
+    "native_dsdt_unchanged": true,
+    "native_uki_unchanged": true,
+    "rtc_alarm_after_cleanup": ""
+  },
+  "physical_lid_test": {
+    "events": {
+      "lid_closed": "2026-11-16T01:08:34.098801+08:00",
+      "lid_opened": "2026-11-16T01:09:30.225093+08:00",
+      "kernel_suspend_entry": "2026-11-16T01:08:34.956033+08:00",
+      "kernel_suspend_exit": "2026-11-16T01:09:30.271722+08:00"
+    },
+    "lid_closed_seconds": 56.126292,
+    "kernel_suspend_interval_seconds": 55.315689,
+    "slp_s0_residency_delta_us": 53173334,
+    "s0ix_fraction_of_kernel_suspend_interval": 0.96127,
+    "resume_after_lid_open_seconds": 0.046629,
+    "rtc_test_alarm_scheduled": false,
+    "suspend_cycles_in_window": 1,
+    "acpi_errors_in_window": [],
+    "lid_cycle_verified": true,
+    "mask_state_restored": true,
+    "main_ec6e_unmasked_before_and_after": true,
+    "native_dsdt_unchanged": true
+  },
+  "not_yet_verified": [
+    "Long-duration closed-lid battery drain",
+    "Other physical wake methods",
+    "First suspend after a future reboot"
+  ],
+  "repository_checks": {
+    "build_from_clean_checkout": true,
+    "compiled_ssdt_matches_hardware_tested_sha256": true,
+    "offline_namespace_checks_passed": 5,
+    "restoration_and_installer_tests_passed": 8,
+    "read_only_hardware_preflight_passed": true,
+    "existing_installation_recognized_and_verified": true,
+    "host_configuration_changed_during_repository_cleanup": false
+  }
+}
