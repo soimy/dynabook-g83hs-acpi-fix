@@ -36,7 +36,7 @@ sudo python3 scripts/runtime_ssdt.py remove
 
 `scripts/ssdt_sleep_pair.py` 使用同一次原始启动，先撤下补充表测原生状态，再加载补充表测第二组。两组均为接电、开盖、s2idle、60 秒 RTC，原始 DSDT 始终不变。每组只允许一次尝试。
 
-当前原生组已完成，仍提前唤醒且 SLP_S0 驻留为 0。临时探针热移除产生的 sysfs 读取竞态已修复；只补测未启动的 SSDT 组，不重复原生组。完整私有记录在 `local/ssdt-trials/`。
+两组均已完成：原生组约 2.95 秒退出，补充 SSDT 后约 3.21 秒退出；两组 SLP_S0 驻留增量均为 0、唤醒 IRQ 均为 9。CHRG 通知错误已修正，但该修正不足以解决提前唤醒。原始 DSDT 和盖子状态保持正常，RTC 闹钟已清空。见 [对照结果](../results/2026-11-16-same-boot-sleep-comparison.json)。完整私有记录在 `local/ssdt-trials/`。
 
 仅当两组数据完整后才判断睡眠效果，CHRG 报错消失与硬件低功耗成功必须分别报告。
 
