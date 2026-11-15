@@ -44,6 +44,8 @@ def without_entries(text):
 def main(remove=False):
     if os.geteuid() != 0:
         raise RuntimeError('Administrator authentication required for ESP writes')
+    if not remove and (ROOT / 'EXPERIMENT-HALTED.json').exists():
+        raise RuntimeError('Experiment halted after control-boot regression; installation is disabled. See EXPERIMENT-HALTED.json.')
     manifest = json.loads((ROOT / 'local/images/manifest.json').read_text())
     capture = json.loads((ROOT / 'local/inputs/capture.json').read_text())
     destinations = {v: Path('/boot/EFI/Linux') / ('chrg-' + v + '.efi') for v in ENTRIES}

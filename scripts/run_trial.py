@@ -132,6 +132,8 @@ if __name__ == '__main__':
     parser.add_argument('variant', choices=['A', 'B'])
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     arguments = parser.parse_args()
+    if (ROOT / 'EXPERIMENT-HALTED.json').exists():
+        parser.error('Experiment halted after control-boot regression. No suspend will be requested.')
     if os.geteuid() != 0:
         parser.error('Root access is required. Use sudo in a visible terminal or pkexec from the agent.')
     if arguments.worker:
