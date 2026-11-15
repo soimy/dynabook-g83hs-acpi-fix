@@ -1,0 +1,37 @@
+{
+  "machine": "dynabook G83/HS",
+  "bios": "8.90",
+  "kernel": "7.2.15-1-omarchy",
+  "mode": "s2idle",
+  "test_method": "User physically closed the lid for about one minute and opened it; normal logind suspend with the installed production hook.",
+  "ac_online_after": "0",
+  "rtc_alarm_after": "",
+  "rtc_test_alarm_scheduled": false,
+  "events": {
+    "lid_closed": "2026-11-16T01:08:34.098801+08:00",
+    "lid_opened": "2026-11-16T01:09:30.225093+08:00",
+    "kernel_suspend_entry": "2026-11-16T01:08:34.956033+08:00",
+    "kernel_suspend_exit": "2026-11-16T01:09:30.271722+08:00"
+  },
+  "lid_closed_seconds": 56.126292,
+  "kernel_suspend_interval_seconds": 55.315689,
+  "suspend_cycles_in_window": 1,
+  "acpi_errors_in_window": [],
+  "slp_s0_residency_delta_us": 53173334,
+  "s0ix_fraction_of_kernel_suspend_interval": 0.96127,
+  "resume_after_lid_open_seconds": 0.046629,
+  "wake_assessment": "Resume followed the logged lid-open event within 47 ms; consistent with normal lid-open wake. No test RTC alarm was scheduled.",
+  "installed_hook_applied_mask": true,
+  "mask_state_restored": true,
+  "gpe6f_unmasked_after": true,
+  "main_ec6e_unmasked_before_and_after": true,
+  "native_dsdt_unchanged": true,
+  "pending_cleanup_exists": false,
+  "installed_files_verified": true,
+  "lid_cycle_verified": true,
+  "remaining_validation": [
+    "Long-duration closed-lid battery drain",
+    "Other physical wake methods",
+    "First suspend after a future reboot"
+  ]
+}
