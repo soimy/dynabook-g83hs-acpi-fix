@@ -1,5 +1,6 @@
 {
   "status": "halted",
+  "scope": "legacy static whole-DSDT A/B only; address-free SSDT is a separate implementation",
   "date": "2026-11-15",
   "reason": "Control A boot reported a closed lid while the user confirmed the lid was open, causing repeated logind suspend requests. The control failed basic validation.",
   "guard_B_booted": false,
