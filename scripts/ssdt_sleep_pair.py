@@ -24,25 +24,25 @@ def save(path, data):
     os.replace(temporary, path)
 
 
-def check_native(reference):
+def check_native(reference, expected_ac='1'):
     state = overlay.native_state()
     for name in ['boot_id', 'dsdt_sha256', 'lid', 'lid_closed', 'mem_sleep']:
         if state[name] != reference[name]:
             raise RuntimeError('Native state changed: ' + name)
-    if read('/sys/class/power_supply/ADP1/online') != '1':
-        raise RuntimeError('AC power changed; stop the comparison')
+    if read('/sys/class/power_supply/ADP1/online') != expected_ac:
+        raise RuntimeError('Power source changed; stop the comparison')
     return state
 
 
-def phase(name, path, native):
+def phase(name, path, native, expected_ac='1'):
     before = snapshot()
     initial_service = service()
-    check_native(native)
+    check_native(native, expected_ac)
     if ALARM.read_text().strip():
         raise RuntimeError('An RTC alarm is already armed')
     start = datetime.datetime.now().astimezone()
     result = {'phase': name, 'started_at': start.isoformat(), 'before': before,
-              'state': 'preparing', 'requested_seconds': 60}
+              'state': 'preparing', 'requested_seconds': 60, 'ac_online': expected_ac}
     save(path, result)
     alarm = ''
     try:
@@ -80,7 +80,7 @@ def phase(name, path, native):
                       elapsed_excluding_suspend=time.monotonic() - active,
                       slp_s0_residency_delta_us=residency, wake_irq=after['/sys/power/pm_wakeup_irq'],
                       held_expected_duration=elapsed >= 50, effective_low_power=residency >= 45_000_000,
-                      after=after, native_after=check_native(native))
+                      after=after, native_after=check_native(native, expected_ac))
         result['journal'] = subprocess.run(
             ['journalctl', '-b', '--no-pager', '-o', 'short-iso-precise', '--since', start.isoformat(),
              '-g', 'PM:|suspend|resume|wakeup|ACPI.*(Error|Warning)|AE_NOT_FOUND'],

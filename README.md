@@ -1,66 +1,57 @@
-# Dynabook G83/HS：CHRG 通知保护实验
+# Dynabook G83/HS：ACPI 与 s2idle 修复
 
-**当前路线：无地址 SSDT 补充，睡眠对照已完成。** 146 字节的小表只补齐缺失通知目标，保留当次固件 DSDT 及所有内存区地址。离线解释器验证和实机加载/撤销验证均已通过，盖子与 DSDT 保持原样；但同次启动对照显示两组仍提前唤醒，CHRG 修正不足以解决休眠。见[新路线与验证记录](docs/address-free-ssdt.md)。它与下面已停用的完整 DSDT A/B 实验是不同的实现。
+本机已定位到 **GPE 6F 唤醒路径造成 s2idle 提前退出**。只补齐 CHRG 对象时仍约 3 秒醒来；睡眠期间临时屏蔽 6F 后，60 秒测试记录到 **57.48 秒硬件 S0ix 驻留**。具体是哪一个下游 PCIe/PEG 设备触发，尚未确认。[隔离试验结果](results/2026-11-16-gpe6f-isolation.json)
 
-**实验已停止，勿安装或启动 A/B 镜像。** A Control 启动后，系统在盖子实际打开时报告盖子合上，logind 因此反复发起休眠。A/B 入口和镜像已移除，B 组未启动。恢复原始 Omarchy 后，盖子状态及桌面运行已核验正常。
+当前修复由两部分组成：
 
-还发现同版本原始 DSDT 在不同启动间包含变化的操作区地址；静态整表覆盖固定了旧地址。这是本实验设计的遗漏，意味着编译及 A/B 差异检查不足以建立可靠控制组。详见[失败与恢复分析](docs/failure-analysis.md)。原始 s2idle 故障尚未修复，本轮不能用于判定 CHRG 补丁效果。
+- **146 字节的无地址 SSDT**：只补齐缺失的 CHRG 通知目标，保留当前启动的固件 DSDT 和全部 OperationRegion 地址，解决 ACPI 地址跨启动变化的问题。
+- **仅在睡眠期间屏蔽 GPE 6F**：进入 s2idle 前屏蔽，恢复后解除；挂起失败时也清理。主 EC GPE 6E 保持原样。
 
-当前仓库保留失败记录和恢复工具，安装器及实测脚本已增加停止保护。以下构建/实验说明作为历史记录，不是可用修复的安装指南。
+已安装的配置针对本机 G83/HS、BIOS 8.90；当前实测内核为 7.2.15-1-omarchy。未修改内核参数、initramfs、UKI 或 Limine 入口。正常使用不设置定时唤醒，不要求重启。[修复机制及撤销方法](docs/sleep-workaround.md)
 
-这是针对 Dynabook G83/HS（A010D，BIOS 8.90）的 ACPI 对照实验仓库，**尚未证明能修复休眠**。
+**已安装配置的电池供电验证通过**：正常 systemd 挂起流程约 61.44 秒后恢复，硬件 S0ix 驻留增加 57.60 秒。醒后 6F 已解除屏蔽，主 EC 正常，DSDT 与原始 UKI 均未变，RTC 已清空。[安装后实测结果](results/2026-11-16-installed-sleep-fix.json)
 
-固件的 `\_SB.PC00.LPCB.EC._Q01` 在适配器和电池通知之后执行 `Notify (CHRG, 0x80)`。本机 Linux 无法解析这个对象，报告 `AE_NOT_FOUND`。补丁只给这一条通知增加 `CondRefOf` 检查，并增加 OEM Revision 以允许启动时覆盖 ACPI 表。
+这会限制睡眠期间经 6F 路径发起的 PCIe/PEG 唤醒。定时恢复已验证，实际合盖/开盖唤醒与较长时间的电池耗电仍需单独验收。不能将一分钟试验换算为整夜续航，也不能据此认定读卡器是唯一故障源。
 
-```asl
-If (CondRefOf (CHRG))
-{
-    Notify (CHRG, 0x80)
-}
-```
+## 验证记录
 
-## 已知基线
+| 条件 | 返回时间 | 硬件 S0ix 驻留 |
+| --- | ---: | ---: |
+| 原生 DSDT | 2.95 秒 | 0 |
+| 原生 DSDT + CHRG SSDT | 3.21 秒 | 0 |
+| CHRG SSDT + 临时屏蔽 6F | 60.97 秒 | 57.48 秒 |
+| 已安装睡眠钩子，电池供电 | 61.44 秒 | 57.60 秒 |
 
-- BIOS：8.90；内核：7.2.15-1-omarchy；模式：s2idle。
-- 接通电源、开盖、RTC 计划 60 秒；挂起流程约 2.254 秒后提前退出。
-- 唤醒 IRQ：9（ACPI SCI）；SLP_S0 低功耗驻留增量：0。
-- 主 EC GPE 为 6E；清醒状态 GPE6F 事件更多。共享 IRQ 和计数不能证明具体设备或 CHRG 报错是唤醒根因。
-- BIOS 升级前 deep 测试曾黑屏并需要强制关机；本实验不切换为 deep。
+前两组为同次启动对照，见[原始结果](results/2026-11-16-same-boot-sleep-comparison.json)。上述测试均使用 60 秒 RTC 定时器，完成后清空；IRQ 9 在异常提前醒来与正常 RTC 唤醒时都可能出现，不能单独据此判错。
 
-## 对照设计
+CHRG 补充表已经通过离线 ACPICA 仿真和实机加载/撤销验证。原始 DSDT 在同次启动内逐字节不变，盖子状态保持正常。[无地址 SSDT 设计](docs/address-free-ssdt.md)
 
-为控制 DSDT 反编译、重新编译造成的差异，准备两个独立启动镜像：
+## 本地构建与检查
 
-- **A Control**：重新编译原始 DSDT，只增加 OEM Revision。
-- **B Guard**：相同编译流程和 OEM Revision，另增加 CHRG 存在性检查。
-
-两者使用同一个原始 UKI 的内核、命令行及 initramfs 内容；只在 early CPIO 中增加对应 ACPI 表。原始 Omarchy 启动入口和默认项保留，实验不写入全局 mkinitcpio 配置、不改 `_OSI`、Hibernate 或设备唤醒设置。
-
-必须先核验启动后实际加载的 DSDT 哈希，再进行单次 s2idle 测试。每次记录挂起/恢复日志、唤醒 IRQ、SLP_S0 驻留时间和 RTC 清理结果。消除 CHRG 报错不等于修复睡眠。
-
-## 构建
-
-需要 Python 3、ACPICA 的 `iasl` 和 GNU binutils。原始固件表应从目标机器本地读取，不在本仓库分发。
+依赖 Python 3、ACPICA 的 iasl/acpiexec。完整固件、编译产物、UKI 和原始系统日志仅保存在忽略的 `local/` 中。
 
 ```bash
-python3 scripts/build_tables.py --input local/DSDT.aml --output local/tables
+python3 scripts/build_ssdt.py
 python3 -m unittest discover -s tests -v
 ```
 
-脚本会核验型号对应的表标识和原始哈希，生成控制组和补丁组 AML，检查 ACPI 校验和、版本，以及两组编译诊断是否一致。编译日志、完整固件表、UKI 和含机器标识的采集结果均放在忽略的 `local/` 中。
+本机安装器要求此前的成功隔离记录及本地捕获输入，不是面向任意型号的一键安装器。已安装的四个文件及摘要记录在本机 `/var/lib/dynabook-sleep/installation.json`。
 
-启动镜像的构建、安装和回滚步骤见[实验步骤](docs/experiment.md)。不要将未核验的表用于其他型号或 BIOS。
+```bash
+# 在本机撤销已安装的配置
+sudo python3 scripts/install_sleep_fix.py --remove
+```
 
-当前构建已通过 8 项测试；A/B 两组均为 0 编译错误、219 条相同的编译警告。编译后再次反编译对比，仅存在 CHRG 保护这一处逻辑差异。原始微码、early CPIO 已有的 578 个条目、压缩主 initramfs 和其他 UKI 段均经验证保持原样。见[镜像校验记录](results/2026-11-15-build-validation.json)和[编译产物逻辑差异](results/2026-11-15-compiled-semantic.diff)。这些是静态检查，不代表已通过实际启动或休眠验证。
+## 已停用的完整 DSDT 实验
 
-## 回滚
+早期 A Control 使用重新编译的完整 DSDT，因固定了前次启动的 OperationRegion 地址，导致盖子误报合上和反复休眠。A/B 入口与镜像已移除；B 未启动，旧安装器已加停止保护。不要恢复这条路线。[失败与恢复分析](docs/failure-analysis.md)、[历史实验步骤](docs/experiment.md)
 
-在 Limine 中选择原有 `Omarchy/linux-omarchy` 启动即可使用固件原始表。实验入口不设为默认项；不刷写 BIOS。安装器保存菜单备份，移除实验时只删除本实验入口和镜像。
+BIOS 升级前 deep 模式曾黑屏并需要强制关机；当前修复只使用 s2idle。
 
 ## 来源与许可
 
-- [内核 ACPI 表覆盖说明](https://docs.kernel.org/admin-guide/acpi/initrd_table_override.html)
+- [内核 SSDT overlays/configfs 文档](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html#loading-acpi-ssdts-from-configfs)
+- [ACPI GPE sysfs 实现](https://github.com/torvalds/linux/blob/master/drivers/acpi/sysfs.c)
 - [Linux 睡眠状态](https://docs.kernel.org/admin-guide/pm/sleep-states.html)
-- [Limine Entry Tool](https://gitlab.com/Zesko/limine-entry-tool)
 
-本仓库新写的脚本采用 MIT 许可。厂商固件及补丁上下文中的厂商代码保留其原有权利；本仓库不附带完整固件。
+本仓库新写脚本采用 MIT 许可。厂商固件及补丁上下文中的厂商代码保留原有权利；仓库不附带完整固件。
