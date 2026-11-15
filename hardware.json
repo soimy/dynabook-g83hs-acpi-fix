@@ -1,0 +1,9 @@
+{
+  "product_name": "dynabook G83/HS",
+  "board": "A010D",
+  "bios_version": "Version 8.90",
+  "kernel": "7.2.15-1-omarchy",
+  "oem_id": "TOSHIB",
+  "oem_table_id": "A010D",
+  "original_dsdt_sha256": "be5cc4e522fa3c8bb360e762f10ee2484ae448581dce4d6d5f45cad5a0beaa9e"
+}
