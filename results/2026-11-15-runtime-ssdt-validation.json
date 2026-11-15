@@ -1,0 +1,15 @@
+{
+  "state": "validated_and_active",
+  "persistent_boot_changes": false,
+  "physical_suspend_requested": false,
+  "probe_before": 0,
+  "probe_with_overlay": 15,
+  "Q01_error_lines": [],
+  "probe_after_unload": 0,
+  "original_dsdt_unchanged": true,
+  "runtime_only": true,
+  "automatic_startup_installed": false,
+  "rollback_verified": true,
+  "lid_remained_open": true,
+  "original_dsdt_same_hash_before_after": true
+}
