@@ -1,0 +1,23 @@
+{
+  "loader_fields_preserved": true,
+  "variants": {
+    "A": {
+      "sha256": "47d45356ba6b0ae7a0041dcec6df7fe456b4f3176f96df193ef93546fdd1b24a",
+      "pe_image_size": 57544704,
+      "initrd_virtual_size": 37719008,
+      "nonoverlapping_sections": true,
+      "main_initramfs_unchanged": true
+    },
+    "B": {
+      "sha256": "90277d00d55d294daf4df37df0da0f7451449cbb2df72aee3a02cc788fa0056a",
+      "pe_image_size": 57544704,
+      "initrd_virtual_size": 37719008,
+      "nonoverlapping_sections": true,
+      "main_initramfs_unchanged": true
+    }
+  },
+  "compiler_errors": 0,
+  "compiler_warning_count_each": 219,
+  "diagnostics_equal": true,
+  "unit_tests_passed": 8
+}
