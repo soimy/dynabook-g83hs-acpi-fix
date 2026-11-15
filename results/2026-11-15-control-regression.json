@@ -11,6 +11,8 @@
   "variant_B_started": false,
   "experimental_entries_removed": true,
   "native_uki_unchanged": true,
-  "native_lid_status_after_reboot": "pending verification",
-  "causality_limit": "Observed during recompiled control boot; comparison with the restored native boot is required before attributing the lid-state change."
+  "native_lid_status_after_reboot": "open; LidClosed=false; no automatic suspend for over 7 minutes",
+  "causality_limit": "Observed during recompiled control boot; comparison with the restored native boot is required before attributing the lid-state change.",
+  "native_recovery_verified": true,
+  "design_limitation": "Original firmware DSDT OperationRegion addresses differ across boots; static reuse preserves old addresses."
 }
