@@ -10,7 +10,7 @@ spec.loader.exec_module(tables)
 
 SOURCE = '''DefinitionBlock ("", "DSDT", 2, "TOSHIB", "A010D", 0x20240103)
 {
-    Method (_Q01, 0, Serialized)
+    Method (_Q01, 0, Serialized)  // _Qxx: EC Query, xx=0x00-0xFF
     {
         Notify (ADP1, 0x80)
         Notify (BAT1, 0x81)
@@ -27,8 +27,9 @@ class RejectionTests(unittest.TestCase):
                 tables.paired_sources(source)
 
     def test_already_guarded_or_changed_firmware_rejected(self):
+        _, guarded, _ = tables.paired_sources(SOURCE)
         for source in [SOURCE.replace('Notify (CHRG', 'Notify (CHG2'),
-                       SOURCE.replace('Notify (CHRG, 0x80)', 'Notify (CHRG, 0x81)')]:
+                       SOURCE.replace('Notify (CHRG, 0x80)', 'Notify (CHRG, 0x81)'), guarded]:
             with self.assertRaises(ValueError):
                 tables.paired_sources(source)
 

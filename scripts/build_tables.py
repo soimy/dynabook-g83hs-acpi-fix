@@ -30,10 +30,12 @@ def table_header(data):
 
 
 def paired_sources(source):
-    matches = list(re.finditer(r'Method \(_Q01, 0, Serialized\)\s*\{[^}]*\}', source))
+    matches = list(re.finditer(r'Method \(_Q01, 0, Serialized\)[ \t]*(?://[^\n]*)?\s*\{[^}]*\}', source))
     if len(matches) != 1:
         raise ValueError('Expected one unambiguous _Q01 method')
     method = matches[0]
+    if 'CondRefOf (CHRG)' in method.group():
+        raise ValueError('The method is already guarded')
     pattern = r'(?m)^(\s*)Notify \(CHRG, 0x80\) // Status Change$'
     if len(list(re.finditer(pattern, method.group()))) != 1:
         raise ValueError('Expected exactly one original CHRG notification in _Q01')
