@@ -101,8 +101,9 @@ Require one suspend/resume cycle and resume following lid-open. Check that `last
 | --- | ---: | ---: |
 | Battery, production hook, 60-second test alarm | 61.44 s including overhead | 57.60 s |
 | Actual lid-close/open, no test alarm | 55.32 s | 53.17 s (96.1%) |
+| Overnight lid-closed, battery | 7 h 36 min 33 s including one brief wake | 99.95% of suspended time |
 
-In the physical lid test, the kernel logged suspend exit approximately 47 ms after lid-open. The native DSDT remained unchanged, with no new ACPI errors. Short tests do not quantify overnight battery drain; long-duration drain, other physical wake methods and the first suspend after a future reboot require their own acceptance checks.
+In the physical lid test, the kernel logged suspend exit approximately 47 ms after lid-open. The native DSDT remained unchanged, with no new ACPI errors. The overnight battery test subsequently measured **1.063 Wh over 7 h 36 min 33 s, averaging approximately 0.14 W** (2.48% of the 42.873 Wh full-charge capacity). Energy changed from 31.739 Wh before sleep to 30.676 Wh immediately after resume; a refreshed reading ten seconds later was 30.646 Wh (71% displayed), including awake use. A single closed-lid wake at 07:35:42 lasted approximately 28 seconds before automatic resuspend. The user reports that a family member may have touched the mouse; the exact wake device is unconfirmed. Other physical wake methods and the first suspend after a future reboot still require their own acceptance checks. This is not a measured S3 comparison.
 
 ## Remove
 

@@ -15,7 +15,7 @@ Diagnose and apply this repository's verified s2idle workaround on the target la
 - Firmware `\_SB.PC00.LPCB.EC._Q01` notifies missing CHRG after adapter/battery notifications, causing AE_NOT_FOUND. Correcting this object alone did not prevent premature wake.
 - Firmware OperationRegion bases can change between boots, including the region holding the lid-state field. Preserve the current firmware DSDT. A DSDT hash may be compared within one boot, never pinned across boots as a machine identifier.
 - The verified fix has two parts: a 146-byte address-free SSDT that conditionally adds a disabled CHRG notification target, and a systemd pre/post quirk that masks only GPE 6F across s2idle and restores its previous state. ExecStopPost provides failure cleanup. GPE 6E is untouched.
-- Successful battery tests: a 60-second timed trial produced 57.60 seconds of hardware S0ix; a real lid cycle spent 53.17 of 55.32 suspended seconds in S0ix (96.1%), with resume logged 47 ms after lid-open. These do not establish overnight battery drain or every wake method. See `validation/verified.json`.
+- Successful battery tests: a 60-second timed trial produced 57.60 seconds of hardware S0ix; a real lid cycle spent 53.17 of 55.32 suspended seconds in S0ix (96.1%), with resume logged 47 ms after lid-open. A subsequent overnight test measured 1.063 Wh over 7 h 36 min 33 s (about 0.14 W, 2.48% of full charge) and 99.95% S0ix residency during suspended time. It included one 28-second closed-lid wake, possibly from a family member touching the mouse, followed by automatic resuspend. The exact wake device, other wake methods and S3 power comparison are not established. See `validation/verified.json`.
 
 ## Inspect before changing anything
 
@@ -53,7 +53,7 @@ python3 scripts/install_sleep_fix.py --status
 3. Require one suspend/resume cycle, no premature wake loop, an open lid after return, same-boot DSDT unchanged, GPE 6F restored, EC 6E unmasked, and no pending cleanup. Use `last_cycle_is_current_boot`, `native_dsdt_matches_last_cycle` and the hook receipt together, not an old successful receipt alone.
 4. Inspect the receipt's `slp_s0_residency_delta_us`; screen-off and stopped fans are supporting observations, not a substitute for hardware residency. If PMC/debugfs is unavailable, report that limitation explicitly. Correlate resume with lid-open; do not call IRQ 9 itself an error.
 5. Do not add a recurring RTC alarm. This installer schedules none. Preserve any pre-existing user RTC alarm; do not clear an alarm you did not create.
-6. Report measured intervals, S0ix residency and cleanup state. Separate confirmed short-test success from long-duration battery drain, other wake methods and first suspend after a future reboot, which need additional validation.
+6. Report measured intervals, S0ix residency and cleanup state. Distinguish the recorded short and overnight successes from results on a new test session. Other wake methods and first suspend after a future reboot still need validation; a S3 power comparison has not been measured.
 
 ## Boundaries and rollback
 
@@ -68,4 +68,4 @@ python3 scripts/install_sleep_fix.py --status
 python3 scripts/install_sleep_fix.py --remove
 ```
 
-Finish with a concise report: diagnosis supported by measurements; files installed or already present; validation actually completed; remaining scope and rollback command. Do not declare CHRG alone, a particular card reader, or overnight battery life proven by the short trial.
+Finish with a concise report: diagnosis supported by measurements; files installed or already present; validation actually completed; remaining scope and rollback command. Do not attribute success to CHRG alone or a particular card reader. Use the overnight energy record for battery-drain claims, rather than extrapolating from a short trial.

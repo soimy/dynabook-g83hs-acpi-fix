@@ -52,7 +52,6 @@
     "native_dsdt_unchanged": true
   },
   "not_yet_verified": [
-    "Long-duration closed-lid battery drain",
     "Other physical wake methods",
     "First suspend after a future reboot"
   ],
@@ -64,5 +63,59 @@
     "read_only_hardware_preflight_passed": true,
     "existing_installation_recognized_and_verified": true,
     "host_configuration_changed_during_repository_cleanup": false
+  },
+  "overnight_battery_test": {
+    "date": "2026-11-16",
+    "power_source": "battery",
+    "battery_full_wh": 42.873,
+    "samples": [
+      {
+        "at": "2026-11-16T01:51:46.300740+08:00",
+        "stage": "actual_pre_suspend",
+        "capacity_percent": 74,
+        "energy_wh": 31.739
+      },
+      {
+        "at": "2026-11-16T09:28:19.304323+08:00",
+        "stage": "immediate_post_resume",
+        "capacity_percent": 72,
+        "energy_wh": 30.676
+      },
+      {
+        "at": "2026-11-16T09:28:29.432150+08:00",
+        "stage": "post_resume_refresh",
+        "capacity_percent": 71,
+        "energy_wh": 30.646
+      }
+    ],
+    "elapsed_seconds": 27393.003583,
+    "kernel_suspended_seconds": 27360.601944085996,
+    "slp_s0_residency_seconds": 27345.568610000002,
+    "s0ix_fraction_of_suspended_time": 0.9994505481232936,
+    "energy_loss_wh": 1.0630000000000024,
+    "energy_loss_percent_of_full": 2.479415949432049,
+    "average_battery_power_w": 0.13969990506535424,
+    "including_last_10_seconds_awake": {
+      "energy_loss_wh": 1.093,
+      "average_battery_power_w": 0.14358942929289115
+    },
+    "suspend_cycles": 2,
+    "intermediate_wake": {
+      "at": "2026-11-16T07:35:42+08:00",
+      "resuspended_at": "2026-11-16T07:36:10+08:00",
+      "lid_closed": true,
+      "user_observation": "A family member may have touched the mouse; exact wake device is not confirmed."
+    },
+    "test_rtc_alarm_scheduled": false,
+    "s3_power_comparison_performed": false,
+    "post_test_integrity": {
+      "native_dsdt_unchanged": true,
+      "fix_source_unchanged": true,
+      "gpe_mask_state_restored": true,
+      "main_ec6e_unmasked": true,
+      "pending_cleanup_exists": false,
+      "temporary_observer_removed": true,
+      "suspend_failures_this_boot": 0
+    }
   }
 }
