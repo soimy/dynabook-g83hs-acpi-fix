@@ -117,5 +117,35 @@
       "temporary_observer_removed": true,
       "suspend_failures_this_boot": 0
     }
+  },
+  "open_lid_idle_suspend_test": {
+    "mode": "s2idle",
+    "power_source": "battery",
+    "lid_state": "open",
+    "idle_timeout_seconds": 600,
+    "ac_auto_suspend": false,
+    "screensaver_at": "2026-11-16T11:59:29.643+08:00",
+    "lock_at": "2026-11-16T12:01:59.644+08:00",
+    "idle_suspend_request_at": "2026-11-16T12:06:59.643+08:00",
+    "kernel_suspend_entry": "2026-11-16T12:07:00.138206+08:00",
+    "kernel_suspend_exit": "2026-11-16T12:22:41.257488+08:00",
+    "successful_suspend_count_increased_by": 1,
+    "suspend_failures_this_boot": 0,
+    "idle_request_count": 1,
+    "request_return_code": 0,
+    "no_new_chrg_errors_in_cycle": true,
+    "kernel_suspend_interval_seconds": 941.119282,
+    "hardware_s0ix_seconds": 938.352996,
+    "s0ix_fraction_of_kernel_suspend_interval": 0.9970606425211889,
+    "native_dsdt_unchanged": true,
+    "pending_cleanup_exists": false,
+    "mask_state_restored": true,
+    "main_ec6e_unmasked": true,
+    "stay_awake_guard_verified": true,
+    "plugin_sha256": {
+      "Service.qml": "121bdaa39ccfe090723509f52a9eed32a42b3b3259d8fa0a2f0f2208062326bb",
+      "manifest.json": "9a9ea0dd72511c1b1135107c027137a1a613063a3239b848d33a1e0d8511b69b"
+    },
+    "physical_ac_transition_tested": false
   }
 }

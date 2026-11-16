@@ -86,6 +86,29 @@ sudo python3 scripts/install_sleep_fix.py --status
 
 安装清单位于 `/var/lib/dynabook-sleep/installation.json`。无需修改 Limine、内核参数、initramfs、UKI，也无需重启；本修复不设置 RTC 闹钟，不配置 Hibernate。
 
+## 可选：开盖闲置时自动睡眠
+
+ACPI 补丁修复的是挂起流程本身，不会增加闲置策略。本机 Omarchy 原先只有 150 秒屏保、300 秒锁屏，logind 为 `IdleAction=ignore`，所以锁屏或黑屏并不代表系统已睡眠。
+
+`omarchy/sym.auto-suspend/` 中已实测通过的可选插件补充了 **仅电池供电时，闲置 600 秒后自动挂起** 的策略，插电时不自动挂起。它使用合成器的闲置通知，遵守应用闲置抑制器和 Omarchy 的 Stay Awake 状态，保留原有屏保/锁屏。首次加载有十分钟保护期，每轮闲置最多请求一次挂起，不设置 RTC 唤醒。
+
+以桌面用户安装，不使用 sudo。目标目录已经存在时应先核对，不覆盖现有文件：
+
+```bash
+mkdir -p "$HOME/.config/omarchy/plugins"
+test ! -e "$HOME/.config/omarchy/plugins/sym.auto-suspend" && \
+  cp -a omarchy/sym.auto-suspend "$HOME/.config/omarchy/plugins/"
+omarchy shell shell rescanPlugins
+omarchy plugin list --json
+# 列表中出现 sym.auto-suspend 后再启用：
+omarchy plugin enable sym.auto-suspend
+omarchy shell sym.auto-suspend status
+```
+
+保存工作后保持电池供电、盖子打开，闲置十分钟后唤醒。核对用户日志中的 `battery idle suspend requested`，以及随后内核的 `PM: suspend entry (s2idle)`。实测 12:06:59 请求睡眠、12:07:00 进入 s2idle、12:22:41 恢复；941.12 秒挂起中有 938.35 秒 S0ix，约占 99.7%。Stay Awake 阻止/恢复联动已测；本轮未进行实际插拔电源的切换测试。
+
+仅停用该闲置策略时执行 `omarchy plugin disable sym.auto-suspend`。固件修复使用下方独立的撤销命令。
+
 ## 验收与已验证结果
 
 保存工作后，在电池供电下合盖至少一分钟再开盖，执行：
@@ -102,6 +125,7 @@ journalctl -b -u systemd-logind.service -u systemd-suspend.service --since '5 mi
 | 电池供电，生产钩子，60 秒测试闹钟 | 61.44 秒（含流程开销） | 57.60 秒 |
 | 实际合盖/开盖，无测试闹钟 | 55.32 秒 | 53.17 秒（96.1%） |
 | 整夜合盖、电池供电 | 7 小时 36 分 33 秒，含一次短暂唤醒 | 睡眠时间的 99.95% |
+| 开盖、电池供电、闲置超时 | 15 分 41 秒 | 938.35 秒（99.7%） |
 
 实际合盖测试在开盖后约 47 毫秒记录到内核退出挂起，原始 DSDT 保持不变，无新增 ACPI 错误。后续整夜测试实测 **7 小时 36 分 33 秒耗能 1.063 Wh，平均约 0.14 W**，相当于满充容量 42.873 Wh 的 2.48%。实际睡前为 31.739 Wh，醒来即时为 30.676 Wh；醒后十秒刷新为 30.646 Wh（显示 71%），这份刷新读数另含清醒耗电。07:35:42 合盖状态下有一次约 28 秒的短暂唤醒，随后自动恢复睡眠；用户反馈家人可能碰到鼠标，但具体设备未由日志唯一确认。其他物理唤醒方式、未来重启后的首次挂起仍需各自验收，本次未进行 S3 功耗对照。
 
@@ -115,7 +139,7 @@ sudo python3 scripts/install_sleep_fix.py --remove
 
 ## 仓库结构与来源
 
-`fix/` 为已验证的运行代码；`acpi/` 为补充表源码和固定摘要；`scripts/` 为构建及安装/检查/撤销入口；`tests/` 为离线语义和恢复保护检查；`validation/` 仅保留成功的实机证据；`prompts/` 提供可复制给 LLM 的修复指令。构建产物位于忽略的 `build/`。
+`fix/` 为已验证的运行代码；`acpi/` 为补充表源码和固定摘要；`scripts/` 为构建及安装/检查/撤销入口；`omarchy/` 为可选的电池闲置睡眠插件；`tests/` 为离线语义和恢复保护检查；`validation/` 仅保留成功的实机证据；`prompts/` 提供可复制给 LLM 的修复指令。构建产物位于忽略的 `build/`。
 
 - [Linux SSDT overlays/configfs](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html#loading-acpi-ssdts-from-configfs)
 - [Linux GPE sysfs 的 mask/unmask 实现](https://github.com/torvalds/linux/blob/master/drivers/acpi/sysfs.c)

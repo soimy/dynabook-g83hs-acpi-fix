@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "sym.auto-suspend",
+  "name": "Battery Idle Suspend",
+  "version": "1.0.0",
+  "author": "sym",
+  "description": "Suspend after ten minutes of compositor idle on battery; respect Stay Awake and application idle inhibitors. No automatic suspend on AC.",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

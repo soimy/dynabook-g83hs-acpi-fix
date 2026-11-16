@@ -25,6 +25,8 @@ Diagnose and apply this repository's verified s2idle workaround on the target la
 4. Confirm ACPI configfs support and availability of Python 3, iasl and acpiexec. Use the operating environment's normal package and privilege workflow. Do not collect or type the user's password; a terminal uses sudo, a background graphical agent may use pkexec.
 5. If hardware or firmware differs, stop before installation and explain the mismatch. Do not relax guards or mask an unverified GPE to make the script run.
 
+If the complaint is open-lid idle drain, inspect the inactivity policy separately: screen-off/lock is not suspend. This Omarchy installation had only screensaver/lock timeouts and logind IdleAction=ignore. The verified optional `omarchy/sym.auto-suspend/` plugin adds 600-second battery-only idle suspend, respects Stay Awake and application idle inhibitors, and leaves AC automatic suspend disabled. Follow the human guide; the firmware installer does not install this optional policy. Its open-lid test reached S0ix for 99.7% of a 941-second suspend. Do not claim physical AC transitions were tested.
+
 ## Build and install
 
 Run as the ordinary user from a clean clone:

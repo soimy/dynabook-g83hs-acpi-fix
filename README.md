@@ -86,6 +86,29 @@ Installed files are root-owned:
 
 The installation record is `/var/lib/dynabook-sleep/installation.json`. No Limine, kernel-command-line, initramfs or UKI changes are needed, and no reboot is required. The workaround schedules no RTC alarm and does not configure hibernation.
 
+## Optional: automatic sleep while the lid is open
+
+The ACPI workaround fixes suspend itself; it does not add an inactivity policy. This Omarchy installation originally configured a screensaver at 150 seconds and locking at 300 seconds, with logind `IdleAction=ignore`. A locked or dark display therefore did not imply system sleep.
+
+The verified optional plugin in `omarchy/sym.auto-suspend/` adds **automatic suspend after 600 seconds of idle on battery only**. AC power disables it. It uses the compositor's idle notifier, respects application idle inhibitors and Omarchy's Stay Awake state, and leaves the existing screensaver/lock behavior intact. It has a ten-minute startup grace period, requests suspend at most once per idle event and schedules no RTC wake.
+
+Install as the desktop user, without sudo. If the target directory already exists, check it rather than overwriting it:
+
+```bash
+mkdir -p "$HOME/.config/omarchy/plugins"
+test ! -e "$HOME/.config/omarchy/plugins/sym.auto-suspend" && \
+  cp -a omarchy/sym.auto-suspend "$HOME/.config/omarchy/plugins/"
+omarchy shell shell rescanPlugins
+omarchy plugin list --json
+# Once sym.auto-suspend appears in the list:
+omarchy plugin enable sym.auto-suspend
+omarchy shell sym.auto-suspend status
+```
+
+Save work and remain idle with the lid open on battery for ten minutes, then wake the machine. Confirm a `battery idle suspend requested` user-journal entry followed by kernel `PM: suspend entry (s2idle)`. The actual test requested sleep at 12:06:59, entered s2idle at 12:07:00 and resumed at 12:22:41: 938.35 seconds in S0ix during 941.12 seconds of suspend (99.7%). Stay Awake blocking/rearming was tested; physical AC plug/unplug transitions were not part of that test.
+
+To disable only this optional policy, run `omarchy plugin disable sym.auto-suspend`. The firmware workaround has its separate removal command below.
+
 ## Acceptance and verified results
 
 Save work, close the lid for at least one minute on battery, reopen it, then run:
@@ -102,6 +125,7 @@ Require one suspend/resume cycle and resume following lid-open. Check that `last
 | Battery, production hook, 60-second test alarm | 61.44 s including overhead | 57.60 s |
 | Actual lid-close/open, no test alarm | 55.32 s | 53.17 s (96.1%) |
 | Overnight lid-closed, battery | 7 h 36 min 33 s including one brief wake | 99.95% of suspended time |
+| Open-lid battery idle timeout | 15 min 41 s | 938.35 s (99.7%) |
 
 In the physical lid test, the kernel logged suspend exit approximately 47 ms after lid-open. The native DSDT remained unchanged, with no new ACPI errors. The overnight battery test subsequently measured **1.063 Wh over 7 h 36 min 33 s, averaging approximately 0.14 W** (2.48% of the 42.873 Wh full-charge capacity). Energy changed from 31.739 Wh before sleep to 30.676 Wh immediately after resume; a refreshed reading ten seconds later was 30.646 Wh (71% displayed), including awake use. A single closed-lid wake at 07:35:42 lasted approximately 28 seconds before automatic resuspend. The user reports that a family member may have touched the mouse; the exact wake device is unconfirmed. Other physical wake methods and the first suspend after a future reboot still require their own acceptance checks. This is not a measured S3 comparison.
 
@@ -115,7 +139,7 @@ Removal verifies the installation record and file hashes, restores the mask owne
 
 ## Repository and references
 
-`fix/` contains the verified runtime; `acpi/` the SSDT source and pinned hashes; `scripts/` the builder and install/check/status/remove entry point; `tests/` offline semantics and restoration safeguards; `validation/` successful hardware evidence; `prompts/` copyable agent instructions. Generated files go into ignored `build/`.
+`fix/` contains the verified runtime; `acpi/` the SSDT source and pinned hashes; `scripts/` the builder and install/check/status/remove entry point; `omarchy/` the optional battery idle-suspend plugin; `tests/` offline semantics and restoration safeguards; `validation/` successful hardware evidence; `prompts/` copyable agent instructions. Generated files go into ignored `build/`.
 
 - [Linux SSDT overlays/configfs](https://docs.kernel.org/admin-guide/acpi/ssdt-overlays.html#loading-acpi-ssdts-from-configfs)
 - [Linux GPE sysfs mask/unmask implementation](https://github.com/torvalds/linux/blob/master/drivers/acpi/sysfs.c)
