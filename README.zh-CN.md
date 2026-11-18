@@ -12,7 +12,7 @@
 
 故障表现为合盖后很快退出 s2idle、反复挂起/恢复，低功耗驻留为 0，机器温热且耗电。主 EC 的 GPE 是 **6E**，清醒时持续大量触发的是另一条 **6F**；本机固件 `_L6F` 分派到 PCIe/PEG GPIO 唤醒路径。
 
-因果证据来自隔离试验：保持当前原始 DSDT 和其他条件不变，仅在睡眠期间屏蔽 6F，系统即可保持约一分钟睡眠，硬件 S0ix 计数明显增加。共享的 ACPI SCI IRQ 9 本身不能指出故障设备；**尚未唯一确定 6F 下游的具体设备**，不能把读卡器直接认定为根因。
+睡眠隔离试验证实，屏蔽 6F 后系统能够持续进入 S0ix。独立的清醒态排查已确认持续触发 6F 的源头是 **PCH 的 `GPP_E4` 引脚**。这个引脚在主板上连接的具体信号仍待确认。
 
 ### 2. CHRG 缺失是另一项固件错误
 
@@ -85,6 +85,22 @@ sudo python3 scripts/install_sleep_fix.py --status
 | `/etc/systemd/system/systemd-suspend.service.d/90-dynabook-gpe6f.conf` | 失败清理 |
 
 安装清单位于 `/var/lib/dynabook-sleep/installation.json`。无需修改 Limine、内核参数、initramfs、UKI，也无需重启；本修复不设置 RTC 闹钟，不配置 Hibernate。
+
+## 清醒态 GPP_E4 修复
+
+G83/HS（A010D/0001、BIOS 8.90）的 `GPP_E4` 被配置为高电平触发的 GPIO 输入，并路由到 SCI。实测其事件状态持续置位，而固件的 `_L6F` 没有处理这个引脚。可回滚的实机对照中，6F 从每秒 129–131 次降为零，CPU0 的 `C3_ACPI` 驻留从 0.23–0.35% 升至 50.47%。该清醒态窗口的 Package C10 驻留为零。
+
+服务只接管 `GPP_E_GPI_GPE_EN` 的 bit 4，系统睡眠前恢复固件原值，唤醒后重新应用。CHRG 与 s2idle 修复可以独立安装。清醒时 6E 和共享的 6F 都保持 `unmasked`。服务启用期间，`GPP_E4` 在清醒时无法产生 ACPI 通知，这根主板信号的用途仍待确认。 [Tiger Lake GPIO 寄存器定义](https://www.mail-archive.com/devel%40edk2.groups.io/msg27348.html)
+
+```bash
+python3 scripts/install_gpp_e4_fix.py build
+sudo python3 scripts/install_gpp_e4_fix.py install
+sudo python3 scripts/install_gpp_e4_fix.py status
+```
+
+构建使用 iASL 20251212 的三份 AML 摘要核验产物。状态应显示清醒态服务已启用且正在生效，并报告 `e4_enabled: false`。停用可执行 `sudo systemctl disable --now dynabook-gpp-e4.service`，完整卸载可执行 `sudo python3 scripts/install_gpp_e4_fix.py remove`。两者都会恢复由本修复接管的原始位。 [实机验证记录](validation/awake-gpp-e4.json)
+
+修复后，主 EC 的 6E 仍约每秒触发 36 次。跟踪显示 `_Q0B` 热区和风扇更新、`_Q11` 电池刷新各约每秒一次，其 EC 读写还会产生握手中断。6E 应保持启用。内屏的 eDP 接收端报告不支持 PSR。按 Intel 的资料，这一平台单屏亮屏且 PSR 关闭时，最深可用状态为 Package C8。 [跟踪记录](validation/awake-gpp-e4.json) · [Tiger Lake 数据手册表 3-6](https://cdrdv2-public.intel.com/631121/631121_TGL%20Datasheet%20Volume1of2%20rev012_PUBLIC.pdf#page=64)
 
 ## 可选：开盖闲置时自动睡眠
 

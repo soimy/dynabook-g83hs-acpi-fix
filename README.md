@@ -12,7 +12,7 @@ This page is the human guide to diagnosis, installation and acceptance. For a co
 
 The affected machine leaves s2idle shortly after lid-close, repeatedly suspends/resumes, remains warm and drains its battery. Hardware S0ix residency stays at zero. The main EC uses **GPE 6E**; a separate **6F** generates frequent events while awake. This firmware's `_L6F` dispatches to PCIe/PEG GPIO wake paths.
 
-Isolation established the causal path: keeping the current native DSDT and other conditions unchanged, masking only 6F across sleep allowed approximately one minute of suspend with substantial hardware S0ix residency. Shared ACPI SCI IRQ 9 cannot identify a device by itself. **The exact downstream device is still unidentified**; the card reader has not been established as the unique cause.
+Isolation during sleep established that masking 6F allows sustained S0ix residency. The separate awake investigation identified **PCH GPIO GPP_E4** as the source of the continuous 6F events. The board signal connected to that pad remains unidentified.
 
 ### 2. Missing CHRG is a separate firmware error
 
@@ -85,6 +85,22 @@ Installed files are root-owned:
 | `/etc/systemd/system/systemd-suspend.service.d/90-dynabook-gpe6f.conf` | Failure cleanup |
 
 The installation record is `/var/lib/dynabook-sleep/installation.json`. No Limine, kernel-command-line, initramfs or UKI changes are needed, and no reboot is required. The workaround schedules no RTC alarm and does not configure hibernation.
+
+## Awake GPP_E4 repair
+
+On G83/HS board A010D/0001 with BIOS 8.90, GPP_E4 is configured as a level-high GPIO input routed to SCI. Its pending bit stays set, and the firmware's `_L6F` handler omits this pad. A reversible hardware test reduced 6F from 129–131 events/second to zero and raised CPU0's `C3_ACPI` residency from 0.23–0.35% to 50.47%. Package C10 did not accrue during that awake test.
+
+The service owns only bit 4 of `GPP_E_GPI_GPE_EN`. It restores the original bit before system sleep and reapplies the repair after wake. The CHRG and s2idle fix can be installed independently. Both GPE 6E and the shared GPE 6F stay unmasked while awake. The repair suppresses any ACPI notifications from GPP_E4 while the system is awake. The physical function of that board signal is still unknown. [Tiger Lake GPIO register definitions](https://www.mail-archive.com/devel%40edk2.groups.io/msg27348.html)
+
+```bash
+python3 scripts/install_gpp_e4_fix.py build
+sudo python3 scripts/install_gpp_e4_fix.py install
+sudo python3 scripts/install_gpp_e4_fix.py status
+```
+
+The build checks the three AML payloads against hashes from iASL 20251212. Status should show the awake service active and enabled, and `e4_enabled: false`. To stop and disable the repair, run `sudo systemctl disable --now dynabook-gpp-e4.service`. To also remove the installed files and sleep unit, run `sudo python3 scripts/install_gpp_e4_fix.py remove`. Both restore the original bit when the repair owns it. [Hardware validation](validation/awake-gpp-e4.json)
+
+After the repair, the main EC's GPE 6E still recorded about 36 events per second. Tracing found roughly one `_Q0B` thermal and fan update and one `_Q11` battery refresh per second, along with the interrupts used by those EC transactions. Keep 6E enabled. The internal eDP panel also reports no Panel Self Refresh support. Intel lists Package C8 as the deepest available state with one active panel and PSR disabled on this platform. [Trace results](validation/awake-gpp-e4.json) · [Tiger Lake datasheet, Table 3-6](https://cdrdv2-public.intel.com/631121/631121_TGL%20Datasheet%20Volume1of2%20rev012_PUBLIC.pdf#page=64)
 
 ## Optional: automatic sleep while the lid is open
 

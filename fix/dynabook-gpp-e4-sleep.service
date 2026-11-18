@@ -1,0 +1,15 @@
+[Unit]
+Description=Restore firmware GPP_E4 policy during system sleep
+After=dynabook-gpp-e4.service
+Before=sleep.target
+PartOf=sleep.target
+StopWhenUnneeded=yes
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/libexec/dynabook-gpp-e4/gpp_e4_fix.py pause
+ExecStopPost=/usr/bin/python3 /usr/local/libexec/dynabook-gpp-e4/gpp_e4_fix.py resume
+
+[Install]
+WantedBy=sleep.target

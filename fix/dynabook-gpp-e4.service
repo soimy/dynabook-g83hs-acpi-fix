@@ -1,0 +1,13 @@
+[Unit]
+Description=Suppress the Dynabook G83/HS GPP_E4 GPE storm
+Requires=sys-kernel-config.mount
+After=sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/libexec/dynabook-gpp-e4/gpp_e4_fix.py apply
+ExecStopPost=/usr/bin/python3 /usr/local/libexec/dynabook-gpp-e4/gpp_e4_fix.py restore
+
+[Install]
+WantedBy=multi-user.target

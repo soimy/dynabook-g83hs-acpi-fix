@@ -1,0 +1,79 @@
+{
+  "tested_at": "2026-11-18",
+  "target": {
+    "product_name": "dynabook G83/HS",
+    "board_name": "A010D/0001",
+    "bios_version": "Version 8.90",
+    "kernel": "7.2.15-1-omarchy"
+  },
+  "gpio_evidence": {
+    "pad": "GPP_E4",
+    "trigger": "level-high GPIO input routed to SCI",
+    "native_ggpe": "0x6F",
+    "native_isme": 1,
+    "group_status": "0x00000014",
+    "native_group_enable": "0x00010010",
+    "awake_repair_group_enable": "0x00010000",
+    "board_signal_identified": false
+  },
+  "awake_reversible_test": {
+    "power_source": "battery",
+    "window_seconds": 10,
+    "gpe6f_events_per_second_before_during_after": [129.29, 0.0, 130.55],
+    "gpe6e_events_per_second_before_during_after": [35.2, 36.8, 35.89],
+    "cpu0_c3_acpi_percent_before_during_after": [0.23, 50.47, 0.35],
+    "package_c10_percent_before_during_after": [0.0, 0.0, 0.0],
+    "rapl_package_w_before_during_after": [6.44, 5.39, 6.10],
+    "original_enable_restored": true
+  },
+  "installed_sleep_test": {
+    "mode": "s2idle",
+    "started_at": "2026-11-18T22:54:45.831462+08:00",
+    "restored_at": "2026-11-18T22:55:17.297157+08:00",
+    "slp_s0_residency_delta_us": 29036244,
+    "e4_enabled_before_sleep": true,
+    "e4_enabled_after_resume": false,
+    "shared_6f_mask_restored": true,
+    "native_dsdt_unchanged": true,
+    "rtc_test_alarm_cleared": true
+  },
+  "installed_awake_verification": {
+    "stop_restored_original_bit": true,
+    "removal_and_reinstall_verified": true,
+    "enabled_at_boot": true,
+    "fresh_boot_tested": false,
+    "window_seconds": 10,
+    "gpe6f_events_per_second": [0.0, 0.0, 0.0],
+    "gpe6e_events_per_second": [35.69, 35.70, 34.4],
+    "cpu0_c3_acpi_percent": [51.82, 61.20, 65.43],
+    "package_c10_percent": [0.0, 0.0, 0.0],
+    "gpe6e_and_gpe6f_enabled_and_unmasked": true
+  },
+  "main_ec_followup": {
+    "awake_gpe_sample": {
+      "seconds": 12.001,
+      "gpe6e_events_per_second": 36.58,
+      "gpe6f_events_per_second": 0.0,
+      "ec_gpe_handler_calls": 439,
+      "cpu0_c3_acpi_percent": 61.2
+    },
+    "ec_query_trace": {
+      "seconds": 12,
+      "queries": {
+        "_Q0B": {"count": 12, "purpose": "updates thermal zone and fan status"},
+        "_Q11": {"count": 12, "purpose": "refreshes battery information"}
+      },
+      "ec_commands": {"read": 120, "write": 48, "query": 24},
+      "fan_status_notifications": 12
+    },
+    "second_awake_sample": {
+      "seconds": 15.02,
+      "gpe6e_events_per_second": 35.62,
+      "gpe6f_events_per_second": 0.0,
+      "cpu0_c3_acpi_percent": 28.74,
+      "package_c10_percent": 0.0
+    },
+    "internal_edp_panel_psr_supported": false,
+    "gpe6e_settings_changed": false
+  }
+}
